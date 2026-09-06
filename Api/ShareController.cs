@@ -73,7 +73,7 @@ public class ShareController : ControllerBase
             JellyfinItemId = request.ItemId,
             JellyfinUserId = userId,
             ExpiresInMinutes = request.ExpiresInMinutes ?? config.DefaultExpiryMinutes,
-            NeverExpires = request.NeverExpires,
+            NeverExpires = request.NeverExpires ?? config.DefaultNeverExpires,
             Password = request.Password,
             MaxTotalPlays = request.MaxTotalPlays ?? (config.DefaultMaxPlays > 0 ? config.DefaultMaxPlays : null),
             MaxConcurrentViewers = request.MaxConcurrentViewers ?? (config.DefaultMaxConcurrentViewers > 0 ? config.DefaultMaxConcurrentViewers : null)
@@ -108,6 +108,7 @@ public class ShareController : ControllerBase
         {
             Configured = !string.IsNullOrEmpty(config.BackendUrl) && !string.IsNullOrEmpty(config.BackendApiKey),
             DefaultExpiryMinutes = config.DefaultExpiryMinutes,
+            DefaultNeverExpires = config.DefaultNeverExpires,
             DefaultMaxPlays = config.DefaultMaxPlays,
             DefaultMaxConcurrentViewers = config.DefaultMaxConcurrentViewers,
             BackendUrl = config.BackendUrl
@@ -276,7 +277,7 @@ public class ShareController : ControllerBase
                 JellyfinItemId = child.Id.ToString("N"),
                 JellyfinUserId = userId,
                 ExpiresInMinutes = request.ExpiresInMinutes ?? config.DefaultExpiryMinutes,
-                NeverExpires = request.NeverExpires,
+                NeverExpires = request.NeverExpires ?? config.DefaultNeverExpires,
                 Password = request.Password,
                 MaxTotalPlays = request.MaxTotalPlays ?? (config.DefaultMaxPlays > 0 ? config.DefaultMaxPlays : null),
                 MaxConcurrentViewers = request.MaxConcurrentViewers ?? (config.DefaultMaxConcurrentViewers > 0 ? config.DefaultMaxConcurrentViewers : null)
@@ -355,8 +356,10 @@ public class CreateShareApiRequest
 
     /// <summary>
     /// Gets or sets a value indicating whether the share never expires.
+    /// Null means "not specified" and falls back to the configured default;
+    /// an explicit false must be able to override a default of true.
     /// </summary>
-    public bool NeverExpires { get; set; }
+    public bool? NeverExpires { get; set; }
 
     /// <summary>
     /// Gets or sets the optional password.
@@ -392,8 +395,10 @@ public class CreateBatchShareRequest
 
     /// <summary>
     /// Gets or sets a value indicating whether the share never expires.
+    /// Null means "not specified" and falls back to the configured default;
+    /// an explicit false must be able to override a default of true.
     /// </summary>
-    public bool NeverExpires { get; set; }
+    public bool? NeverExpires { get; set; }
 
     /// <summary>
     /// Gets or sets the optional password (same for all shares).
