@@ -73,6 +73,9 @@ public class ShareController : ControllerBase
             JellyfinItemId = request.ItemId,
             JellyfinUserId = userId,
             ExpiresInMinutes = request.ExpiresInMinutes ?? config.DefaultExpiryMinutes,
+            NeverExpires = request.NeverExpires ?? config.DefaultNeverExpires,
+            MaxVideoHeight = request.MaxVideoHeight,
+            MaxVideoBitrate = request.MaxVideoBitrate,
             Password = request.Password,
             MaxTotalPlays = request.MaxTotalPlays ?? (config.DefaultMaxPlays > 0 ? config.DefaultMaxPlays : null),
             MaxConcurrentViewers = request.MaxConcurrentViewers ?? (config.DefaultMaxConcurrentViewers > 0 ? config.DefaultMaxConcurrentViewers : null)
@@ -107,6 +110,7 @@ public class ShareController : ControllerBase
         {
             Configured = !string.IsNullOrEmpty(config.BackendUrl) && !string.IsNullOrEmpty(config.BackendApiKey),
             DefaultExpiryMinutes = config.DefaultExpiryMinutes,
+            DefaultNeverExpires = config.DefaultNeverExpires,
             DefaultMaxPlays = config.DefaultMaxPlays,
             DefaultMaxConcurrentViewers = config.DefaultMaxConcurrentViewers,
             BackendUrl = config.BackendUrl
@@ -153,8 +157,12 @@ public class ShareController : ControllerBase
             s.CreatedAt,
             s.RevokedAt,
             s.HasPassword,
-            PublicUrl = $"{config.BackendUrl?.TrimEnd('/')}/s/{s.PublicToken}",
-            IsExpired = s.ExpiresAt < DateTime.UtcNow,
+            // The backend knows its own public base URL; BackendUrl is only how *this*
+            // server reaches it, which differs behind Docker or a reverse proxy.
+            PublicUrl = string.IsNullOrEmpty(s.PublicUrl)
+                ? $"{config.BackendUrl?.TrimEnd('/')}/s/{s.PublicToken}"
+                : s.PublicUrl,
+            IsExpired = s.ExpiresAt.HasValue && s.ExpiresAt.Value < DateTime.UtcNow,
             IsRevoked = s.RevokedAt != null
         }).ToList();
 
@@ -271,6 +279,9 @@ public class ShareController : ControllerBase
                 JellyfinItemId = child.Id.ToString("N"),
                 JellyfinUserId = userId,
                 ExpiresInMinutes = request.ExpiresInMinutes ?? config.DefaultExpiryMinutes,
+                NeverExpires = request.NeverExpires ?? config.DefaultNeverExpires,
+                MaxVideoHeight = request.MaxVideoHeight,
+                MaxVideoBitrate = request.MaxVideoBitrate,
                 Password = request.Password,
                 MaxTotalPlays = request.MaxTotalPlays ?? (config.DefaultMaxPlays > 0 ? config.DefaultMaxPlays : null),
                 MaxConcurrentViewers = request.MaxConcurrentViewers ?? (config.DefaultMaxConcurrentViewers > 0 ? config.DefaultMaxConcurrentViewers : null)
@@ -348,6 +359,24 @@ public class CreateShareApiRequest
     public int? ExpiresInMinutes { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the share never expires.
+    /// Null means "not specified" and falls back to the configured default;
+    /// an explicit false must be able to override a default of true.
+    /// </summary>
+    public bool? NeverExpires { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum picture height for this share (720 for 720p).
+    /// Null or 0 means the quality of the source.
+    /// </summary>
+    public int? MaxVideoHeight { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum transcode bitrate for this share, in bits per second.
+    /// </summary>
+    public int? MaxVideoBitrate { get; set; }
+
+    /// <summary>
     /// Gets or sets the optional password.
     /// </summary>
     public string? Password { get; set; }
@@ -378,6 +407,24 @@ public class CreateBatchShareRequest
     /// Gets or sets the expiry in minutes.
     /// </summary>
     public int? ExpiresInMinutes { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the share never expires.
+    /// Null means "not specified" and falls back to the configured default;
+    /// an explicit false must be able to override a default of true.
+    /// </summary>
+    public bool? NeverExpires { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum picture height for this share (720 for 720p).
+    /// Null or 0 means the quality of the source.
+    /// </summary>
+    public int? MaxVideoHeight { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum transcode bitrate for this share, in bits per second.
+    /// </summary>
+    public int? MaxVideoBitrate { get; set; }
 
     /// <summary>
     /// Gets or sets the optional password (same for all shares).
