@@ -137,7 +137,7 @@ jobs:
               "name": "Jellyfin Share",
               "overview": "Create temporary, shareable links for media items",
               "description": "A plugin that adds a Share button to movie and episode detail pages, allowing you to create temporary, password-protected shareable links for your media content.",
-              "owner": "monxas",
+              "owner": "stanislavhannes",
               "category": "General",
               "versions": [$NEW_VERSION]
             }
