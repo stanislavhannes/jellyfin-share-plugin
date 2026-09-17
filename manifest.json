@@ -6,6 +6,15 @@
     "description": "A plugin that adds a Share button to movie, episode, season and series detail pages, allowing you to create temporary, password-protected shareable links with optional quality limits.",
     "owner": "stanislavhannes",
     "category": "General",
-    "versions": []
+    "versions": [
+      {
+        "version": "2.0.0",
+        "changelog": "See https://github.com/stanislavhannes/jellyfin-share-plugin/releases/tag/v2.0.0",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/stanislavhannes/jellyfin-share-plugin/releases/download/v2.0.0/jellyfin-plugin-share-2.0.0.zip",
+        "checksum": "bf4b5b9b03ed7fa5a7ca5438da51a848",
+        "timestamp": "2026-09-17T11:37:04Z"
+      }
+    ]
   }
 ]
