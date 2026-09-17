@@ -2,23 +2,31 @@
 
 A Jellyfin plugin that adds a "Share" button to movie, episode, season and series detail pages, allowing you to create temporary, shareable links for your media content.
 
+This is a fork of [monxas/jellyfin-share-plugin](https://github.com/monxas/jellyfin-share-plugin)
+with permission checks and a number of fixes — see
+[What this fork changes](#what-this-fork-changes).
+
+> **This is the 1.x line, for Jellyfin 10.11.** Jellyfin 12 needs the 2.x line on
+> `main`, which is built against .NET 10 and will not load on 10.11. The catalogue
+> serves whichever line your server can run.
+
 ## Requirements
 
 - Jellyfin 10.11 or later (built against the 10.11 ABI / .NET 9)
-- [Jellyfin Share Backend](https://github.com/monxas/jellyfin-share-backend) running and configured
+- [Jellyfin Share Backend](https://github.com/stanislavhannes/jellyfin-share-backend) running and configured
 
 ## Installation
 
 ### From Repository (Recommended)
 
 1. Go to **Dashboard → Plugins → Repositories**
-2. Add repository: `https://raw.githubusercontent.com/monxas/jellyfin-share-plugin/main/manifest.json`
+2. Add repository: `https://raw.githubusercontent.com/stanislavhannes/jellyfin-share-plugin/main/manifest.json`
 3. Go to **Catalog** and install "Jellyfin Share"
 4. Restart Jellyfin
 
 ### Manual Installation
 
-1. Download the latest release from [Releases](https://github.com/monxas/jellyfin-share-plugin/releases)
+1. Download the latest release from [Releases](https://github.com/stanislavhannes/jellyfin-share-plugin/releases)
 2. Extract `Jellyfin.Plugin.Share.dll` to your Jellyfin plugins directory:
    - Linux: `/var/lib/jellyfin/plugins/JellyfinShare/`
    - Docker (official `jellyfin/jellyfin`): `/config/plugins/Jellyfin Share_<version>/`
@@ -115,7 +123,7 @@ revoke or inspect shares they created themselves.
 
 ```bash
 # Clone the repository
-git clone https://github.com/monxas/jellyfin-share-plugin.git
+git clone https://github.com/stanislavhannes/jellyfin-share-plugin.git
 cd jellyfin-share-plugin
 
 # Build
@@ -150,10 +158,45 @@ dotnet build -c Release
 2. Check if the URL is accessible from Jellyfin server
 3. Verify the API key matches what's configured in the backend
 
+## What this fork changes
+
+Relative to the upstream project. Every item was reproduced on a live server
+before being fixed.
+
+**Security**
+
+- A user could share any item on the server, including content their own account
+  is not allowed to open — items were resolved through `ILibraryManager`, which
+  has no notion of who is asking. Now resolved against the caller with
+  `IsVisibleStandalone`.
+- A user could revoke or read the statistics of another user's share by its id.
+  Both now refuse with 403.
+
+**Fixes**
+
+- The share button appeared only on the first detail page visited. Jellyfin keeps
+  visited views hidden in the DOM, and the button row was looked up across the
+  whole document, so season and episode pages found the stale one.
+- The item type was guessed from English UI text, so on a non-English Jellyfin it
+  silently fell back to "Movie" and hid the season and series batch options.
+- Creating links for each season and then sharing the series itself threw
+  `can't access property "value"` and produced no link.
+- "My Shares" listed unreachable links: the URL was composed from the plugin's
+  own backend address, which behind Docker or a proxy is not what a browser can
+  open.
+- The configured default expiry was never read by the dialog.
+
+**Features**
+
+- Share button on season and series pages, with batch creation per season or
+  episode.
+- Expiry in days, plus shares that never expire.
+- Quality choice per share: Original, 1080p, 720p or 480p.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
 
 ## Related
 
-- [Jellyfin Share Backend](https://github.com/monxas/jellyfin-share-backend) - The backend server that handles share links
+- [Jellyfin Share Backend](https://github.com/stanislavhannes/jellyfin-share-backend) - The backend server that handles share links
