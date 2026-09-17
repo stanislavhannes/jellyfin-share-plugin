@@ -4,10 +4,15 @@ A Jellyfin plugin that adds a "Share" button to movie, episode, season and serie
 
 ## Requirements
 
-- Jellyfin 10.11 or later (built against the 10.11 ABI / .NET 9)
+- Jellyfin 12.0 or later (built against the 12.1 ABI / .NET 10)
+- For Jellyfin 10.11 use the 1.x line instead — a 2.x build will not load on it
 - [Jellyfin Share Backend](https://github.com/monxas/jellyfin-share-backend) running and configured
 
 ## Installation
+
+The catalogue serves the right build automatically: Jellyfin only offers versions
+whose `targetAbi` it satisfies, so a 10.11 server sees the 1.x line and a 12.x
+server sees 2.x.
 
 ### From Repository (Recommended)
 
@@ -78,7 +83,7 @@ Confirm it worked — this line should appear on startup:
 ```
 
 Do **not** also inject `client.js` via the JavaScript Injector plugin or the Custom CSS
-`</style><script>` trick — those are legacy workarounds, they break on Jellyfin 10.11, and if
+`</style><script>` trick — those are legacy workarounds, they broke on Jellyfin 10.11, and if
 one starts working again the script loads twice.
 
 ## Usage
@@ -121,7 +126,7 @@ cd jellyfin-share-plugin
 # Build
 dotnet build -c Release
 
-# The DLL will be in bin/Release/net9.0/
+# The DLL will be in bin/Release/net10.0/
 ```
 
 ## Troubleshooting
