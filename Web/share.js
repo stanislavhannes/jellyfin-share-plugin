@@ -58,6 +58,59 @@
         return `${days}d left`;
     }
 
+    // Copies text to the clipboard, and says whether it worked.
+    //
+    // navigator.clipboard exists only in a secure context - HTTPS or localhost.
+    // Jellyfin is very often opened over plain http on a LAN address, where it is
+    // undefined: the old buttons threw on the first line and copied nothing,
+    // without a word. The fallback is the selection-based copy every browser still
+    // honours there. Its textarea goes inside the open <dialog>: a modal makes the
+    // rest of the page inert, and a textarea appended to <body> could not be
+    // selected.
+    async function copyText(text, anchor) {
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (e) {
+                // Permission refused - fall through to the selection copy.
+            }
+        }
+        const host = anchor?.closest('dialog') || document.body;
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
+        host.appendChild(ta);
+        ta.select();
+        try {
+            return document.execCommand('copy');
+        } catch (e) {
+            return false;
+        } finally {
+            ta.remove();
+        }
+    }
+
+    // Wires a copy button: a tick when it worked; when it did not, the link is
+    // selected (if there is a field showing it) so Ctrl/Cmd+C finishes the job,
+    // and the button says so instead of pretending.
+    function bindCopy(btn, getText, field) {
+        const idle = btn.innerHTML;
+        // Icon-only buttons stay icon-only; a labelled one says what happened. The
+        // icon's own ligature ("content_copy") is text too, so only text outside
+        // it counts as a label.
+        const labelled = [...btn.childNodes].some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+        btn.addEventListener('click', async () => {
+            const ok = await copyText(getText(), btn);
+            if (!ok && field) field.select();
+            btn.innerHTML = `<span class="material-icons" style="font-size: inherit;">${ok ? 'check' : 'error_outline'}</span>`
+                + (labelled ? (ok ? ' Copied!' : ' Press Ctrl+C') : '');
+            btn.title = ok ? 'Copied' : 'Could not copy automatically - press Ctrl+C (Cmd+C on a Mac)';
+            setTimeout(() => { btn.innerHTML = idle; }, ok ? 2000 : 4000);
+        });
+    }
+
     // Renders the single-share result into the shared result box. The batch branch
     // overwrites the same box with its own list, so this has to rebuild the markup
     // and re-attach its listeners rather than assume they survived.
@@ -81,15 +134,8 @@
         `;
         resultDiv.querySelector('#shareUrl').value = publicUrl;
         resultDiv.querySelector('#shareQrCode').src = QRCode.generate(publicUrl, 150);
-        resultDiv.querySelector('#copyShareUrl').addEventListener('click', () => {
-            const urlInput = resultDiv.querySelector('#shareUrl');
-            urlInput.select();
-            navigator.clipboard.writeText(urlInput.value).then(() => {
-                const copyBtn = resultDiv.querySelector('#copyShareUrl');
-                copyBtn.innerHTML = '<span class="material-icons">check</span>';
-                setTimeout(() => { copyBtn.innerHTML = '<span class="material-icons">content_copy</span>'; }, 2000);
-            });
-        });
+        const urlInput = resultDiv.querySelector('#shareUrl');
+        bindCopy(resultDiv.querySelector('#copyShareUrl'), () => urlInput.value, urlInput);
         resultDiv.style.display = 'block';
     }
 
@@ -359,12 +405,7 @@
 
                         // Add event listeners for batch result buttons
                         resultDiv.querySelectorAll('.jfshare-btn-copy').forEach(btn => {
-                            btn.addEventListener('click', () => {
-                                navigator.clipboard.writeText(btn.dataset.url).then(() => {
-                                    btn.innerHTML = '<span class="material-icons" style="font-size: 0.9em;">check</span>';
-                                    setTimeout(() => { btn.innerHTML = '<span class="material-icons" style="font-size: 0.9em;">content_copy</span>'; }, 1500);
-                                });
-                            });
+                            bindCopy(btn, () => btn.dataset.url);
                         });
                         resultDiv.querySelectorAll('.jfshare-btn-qr').forEach(btn => {
                             btn.addEventListener('click', () => {
@@ -529,14 +570,7 @@
 
             // Add event listeners
             container.querySelectorAll('.jfshare-btn-copy').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    navigator.clipboard.writeText(btn.dataset.url).then(() => {
-                        btn.innerHTML = '<span class="material-icons" style="font-size: 1em;">check</span> Copied!';
-                        setTimeout(() => {
-                            btn.innerHTML = '<span class="material-icons" style="font-size: 1em;">content_copy</span> Copy';
-                        }, 2000);
-                    });
-                });
+                bindCopy(btn, () => btn.dataset.url);
             });
 
             container.querySelectorAll('.jfshare-btn-qr').forEach(btn => {
@@ -643,13 +677,7 @@
         dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
         dlg.addEventListener('close', () => dlg.remove());
 
-        dlg.querySelector('#copyQrUrl').addEventListener('click', () => {
-            navigator.clipboard.writeText(url).then(() => {
-                const btn = dlg.querySelector('#copyQrUrl');
-                btn.innerHTML = '<span class="material-icons">check</span>';
-                setTimeout(() => { btn.innerHTML = '<span class="material-icons">content_copy</span>'; }, 2000);
-            });
-        });
+        bindCopy(dlg.querySelector('#copyQrUrl'), () => url, dlg.querySelector('.jfshare-url'));
 
         dlg.showModal();
     }
