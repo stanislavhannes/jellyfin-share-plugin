@@ -148,6 +148,7 @@
         .jfshare-badge-revoked { background: rgba(255,77,79,0.2); color: #ff6b6b; }
         .jfshare-badge-active { background: rgba(82,196,26,0.2); color: #52c41a; }
         .jfshare-badge-password { background: rgba(250,173,20,0.2); color: #faad14; }
+        .jfshare-badge-nodownload { background: rgba(255,255,255,0.08); color: #aaa; }
         .jfshare-empty { text-align: center; padding: 3em; color: #888; }
         .jfshare-analytics { margin-top: 1em; }
         .jfshare-stat { display: inline-block; text-align: center; padding: 1em; background: #2a2a2a; border-radius: 8px; margin-right: 1em; margin-bottom: 1em; min-width: 100px; }
@@ -224,6 +225,14 @@
                     <div class="jfshare-hint">0 = unlimited</div>
                 </div>
 
+                <div class="jfshare-field">
+                    <label class="jfshare-checkbox" style="margin-top: 0;">
+                        <input type="checkbox" id="shareAllowDownload" checked>
+                        <span>Allow downloads</span>
+                    </label>
+                    <div class="jfshare-hint">Viewers can save the original file${(isSeries || isSeason) ? ', or every episode as one ZIP' : ''}. Each download counts as one play.</div>
+                </div>
+
                 <!-- Filled by renderSingleResult or the batch branch. Both replace the
                      whole block, so neither may rely on markup the other left behind. -->
                 <div id="shareResult" class="jfshare-success" style="display: none;"></div>
@@ -295,6 +304,7 @@
             const password = dlg.querySelector('#sharePassword').value || null;
             const maxPlays = parseInt(dlg.querySelector('#shareMaxPlays').value) || null;
             const maxViewers = parseInt(dlg.querySelector('#shareMaxViewers').value) || null;
+            const allowDownload = dlg.querySelector('#shareAllowDownload').checked;
 
             try {
                 if (shareType !== 'single') {
@@ -311,7 +321,8 @@
                             maxVideoBitrate: qualityBitrate,
                             password: password,
                             maxTotalPlays: maxPlays,
-                            maxConcurrentViewers: maxViewers
+                            maxConcurrentViewers: maxViewers,
+                            allowDownload: allowDownload
                         }),
                         dataType: 'json'
                     });
@@ -380,7 +391,8 @@
                             maxVideoBitrate: qualityBitrate,
                             password: password,
                             maxTotalPlays: maxPlays,
-                            maxConcurrentViewers: maxViewers
+                            maxConcurrentViewers: maxViewers,
+                            allowDownload: allowDownload
                         }),
                         dataType: 'json'
                     });
@@ -486,6 +498,7 @@
                                   share.IsExpired ? '<span class="jfshare-badge jfshare-badge-expired">Expired</span>' :
                                   '<span class="jfshare-badge jfshare-badge-active">Active</span>'}
                                 ${share.HasPassword ? '<span class="jfshare-badge jfshare-badge-password">Password</span>' : ''}
+                                ${share.AllowDownload === false ? '<span class="jfshare-badge jfshare-badge-nodownload">No downloads</span>' : ''}
                             </div>
                         </div>
                         <div class="jfshare-list-meta">

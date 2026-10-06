@@ -100,7 +100,8 @@ public class ShareController : ControllerBase
         MaxVideoBitrate = options.MaxVideoBitrate,
         Password = options.Password,
         MaxTotalPlays = options.MaxTotalPlays ?? (config.DefaultMaxPlays > 0 ? config.DefaultMaxPlays : null),
-        MaxConcurrentViewers = options.MaxConcurrentViewers ?? (config.DefaultMaxConcurrentViewers > 0 ? config.DefaultMaxConcurrentViewers : null)
+        MaxConcurrentViewers = options.MaxConcurrentViewers ?? (config.DefaultMaxConcurrentViewers > 0 ? config.DefaultMaxConcurrentViewers : null),
+        AllowDownload = options.AllowDownload
     };
 
     /// <summary>
@@ -213,6 +214,7 @@ public class ShareController : ControllerBase
             s.CreatedAt,
             s.RevokedAt,
             s.HasPassword,
+            s.AllowDownload,
             // The backend knows its own public base URL; BackendUrl is only how *this*
             // server reaches it, which differs behind Docker or a reverse proxy.
             PublicUrl = string.IsNullOrEmpty(s.PublicUrl)
@@ -457,7 +459,13 @@ public class ShareOptions
     /// <summary>
     /// Gets or sets the max concurrent viewers.
     /// </summary>
-    public int? MaxConcurrentViewers { get; set; }}
+    public int? MaxConcurrentViewers { get; set; }
+    /// <summary>
+    /// Gets or sets a value indicating whether viewers may download the file.
+    /// Null means "not specified", which keeps downloads on.
+    /// </summary>
+    public bool? AllowDownload { get; set; }
+}
 
 /// <summary>
 /// API request to create a share.
