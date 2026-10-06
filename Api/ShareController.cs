@@ -85,6 +85,25 @@ public class ShareController : ControllerBase
     }
 
     /// <summary>
+    /// Builds the backend request for one item from the dialog's options, filling
+    /// what the dialog left out from the plugin's configured defaults. Single and
+    /// batch creation share it, so an option cannot be added to one and missed in
+    /// the other.
+    /// </summary>
+    private static CreateShareRequest BuildShareRequest(string itemId, string userId, ShareOptions options, PluginConfiguration config) => new()
+    {
+        JellyfinItemId = itemId,
+        JellyfinUserId = userId,
+        ExpiresInMinutes = options.ExpiresInMinutes ?? config.DefaultExpiryMinutes,
+        NeverExpires = options.NeverExpires ?? config.DefaultNeverExpires,
+        MaxVideoHeight = options.MaxVideoHeight,
+        MaxVideoBitrate = options.MaxVideoBitrate,
+        Password = options.Password,
+        MaxTotalPlays = options.MaxTotalPlays ?? (config.DefaultMaxPlays > 0 ? config.DefaultMaxPlays : null),
+        MaxConcurrentViewers = options.MaxConcurrentViewers ?? (config.DefaultMaxConcurrentViewers > 0 ? config.DefaultMaxConcurrentViewers : null)
+    };
+
+    /// <summary>
     /// Creates a share link for a media item.
     /// </summary>
     /// <param name="request">Share request.</param>
@@ -114,18 +133,7 @@ public class ShareController : ControllerBase
             return BadRequest(new { Error = "Item not found" });
         }
 
-        var shareRequest = new CreateShareRequest
-        {
-            JellyfinItemId = request.ItemId,
-            JellyfinUserId = userId,
-            ExpiresInMinutes = request.ExpiresInMinutes ?? config.DefaultExpiryMinutes,
-            NeverExpires = request.NeverExpires ?? config.DefaultNeverExpires,
-            MaxVideoHeight = request.MaxVideoHeight,
-            MaxVideoBitrate = request.MaxVideoBitrate,
-            Password = request.Password,
-            MaxTotalPlays = request.MaxTotalPlays ?? (config.DefaultMaxPlays > 0 ? config.DefaultMaxPlays : null),
-            MaxConcurrentViewers = request.MaxConcurrentViewers ?? (config.DefaultMaxConcurrentViewers > 0 ? config.DefaultMaxConcurrentViewers : null)
-        };
+        var shareRequest = BuildShareRequest(request.ItemId, userId, request, config);
 
         var result = await _shareService.CreateShareAsync(shareRequest);
         if (result == null)
@@ -350,18 +358,7 @@ public class ShareController : ControllerBase
                 continue;
             }
 
-            var shareRequest = new CreateShareRequest
-            {
-                JellyfinItemId = child.Id.ToString("N"),
-                JellyfinUserId = userId,
-                ExpiresInMinutes = request.ExpiresInMinutes ?? config.DefaultExpiryMinutes,
-                NeverExpires = request.NeverExpires ?? config.DefaultNeverExpires,
-                MaxVideoHeight = request.MaxVideoHeight,
-                MaxVideoBitrate = request.MaxVideoBitrate,
-                Password = request.Password,
-                MaxTotalPlays = request.MaxTotalPlays ?? (config.DefaultMaxPlays > 0 ? config.DefaultMaxPlays : null),
-                MaxConcurrentViewers = request.MaxConcurrentViewers ?? (config.DefaultMaxConcurrentViewers > 0 ? config.DefaultMaxConcurrentViewers : null)
-            };
+            var shareRequest = BuildShareRequest(child.Id.ToString("N"), userId, request, config);
 
             try
             {
@@ -419,16 +416,11 @@ public class ShareController : ControllerBase
 }
 
 /// <summary>
-/// API request to create a share.
+/// The options a share is created with, from the dialog. Anything left null
+/// falls back to the plugin's configured default.
 /// </summary>
-public class CreateShareApiRequest
+public class ShareOptions
 {
-    /// <summary>
-    /// Gets or sets the item ID to share.
-    /// </summary>
-    [Required]
-    public string ItemId { get; set; } = string.Empty;
-
     /// <summary>
     /// Gets or sets the expiry in minutes.
     /// </summary>
@@ -465,57 +457,31 @@ public class CreateShareApiRequest
     /// <summary>
     /// Gets or sets the max concurrent viewers.
     /// </summary>
-    public int? MaxConcurrentViewers { get; set; }
+    public int? MaxConcurrentViewers { get; set; }}
+
+/// <summary>
+/// API request to create a share.
+/// </summary>
+public class CreateShareApiRequest : ShareOptions
+{
+    /// <summary>
+    /// Gets or sets the item ID to share.
+    /// </summary>
+    [Required]
+    public string ItemId { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// API request to create batch shares for children of an item.
+/// API request to create batch shares for children of an item. The options apply
+/// to every share created.
 /// </summary>
-public class CreateBatchShareRequest
+public class CreateBatchShareRequest : ShareOptions
 {
     /// <summary>
     /// Gets or sets the parent item ID (Season or Series).
     /// </summary>
     [Required]
     public string ParentItemId { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Gets or sets the expiry in minutes.
-    /// </summary>
-    public int? ExpiresInMinutes { get; set; }
-
-    /// <summary>
-    /// Gets or sets a value indicating whether the share never expires.
-    /// Null means "not specified" and falls back to the configured default;
-    /// an explicit false must be able to override a default of true.
-    /// </summary>
-    public bool? NeverExpires { get; set; }
-
-    /// <summary>
-    /// Gets or sets the maximum picture height for this share (720 for 720p).
-    /// Null or 0 means the quality of the source.
-    /// </summary>
-    public int? MaxVideoHeight { get; set; }
-
-    /// <summary>
-    /// Gets or sets the maximum transcode bitrate for this share, in bits per second.
-    /// </summary>
-    public int? MaxVideoBitrate { get; set; }
-
-    /// <summary>
-    /// Gets or sets the optional password (same for all shares).
-    /// </summary>
-    public string? Password { get; set; }
-
-    /// <summary>
-    /// Gets or sets the max plays per share.
-    /// </summary>
-    public int? MaxTotalPlays { get; set; }
-
-    /// <summary>
-    /// Gets or sets the max concurrent viewers per share.
-    /// </summary>
-    public int? MaxConcurrentViewers { get; set; }
 }
 
 /// <summary>
