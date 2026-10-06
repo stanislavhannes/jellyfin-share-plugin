@@ -88,6 +88,8 @@
         ta.setAttribute('readonly', '');
         ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
         host.appendChild(ta);
+        // iOS Safari only selects a field that has focus.
+        ta.focus();
         ta.select();
         try {
             return document.execCommand('copy');
@@ -98,9 +100,10 @@
         }
     }
 
-    // Wires a copy button: a tick when it worked; when it did not, the link is
-    // selected (if there is a field showing it) so Ctrl/Cmd+C finishes the job,
-    // and the button says so instead of pretending.
+    // Wires a copy button: a tick when it worked. When it did not, the link is
+    // put where the viewer can copy it by hand - selected in its field, or, for
+    // a button with no field beside it, in a prompt - and the button says so
+    // instead of pretending.
     function bindCopy(btn, getText, field) {
         const idle = btn.innerHTML;
         // Icon-only buttons stay icon-only; a labelled one says what happened. The
@@ -109,7 +112,10 @@
         const labelled = [...btn.childNodes].some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
         btn.addEventListener('click', async () => {
             const ok = await copyText(getText(), btn);
-            if (!ok && field) field.select();
+            if (!ok) {
+                if (field) field.select();
+                else window.prompt('Copy this link:', getText());
+            }
             btn.innerHTML = `<span class="material-icons" style="font-size: inherit;">${ok ? 'check' : 'error_outline'}</span>`
                 + (labelled ? (ok ? ' Copied!' : ' Press Ctrl+C') : '');
             btn.title = ok ? 'Copied' : 'Could not copy automatically - press Ctrl+C (Cmd+C on a Mac)';
@@ -867,12 +873,13 @@
         return null;
     }
 
-    // The button once placed. While it is still in the page there is nothing to
-    // do, and checking that costs no layout - this runs on DOM changes.
+    // The button once placed. While it is still in the page and on screen there
+    // is nothing to do. Jellyfin can keep a header in the page while hiding it,
+    // so being connected alone is not enough.
     let mySharesBtn = null;
 
     function addMySharesButton() {
-        if (mySharesBtn?.isConnected) return;
+        if (mySharesBtn?.isConnected && mySharesBtn.getClientRects().length > 0) return;
         const slot = headerSlot();
         if (!slot || slot.host.querySelector('.btnMyShares')) return;
 
