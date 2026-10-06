@@ -842,39 +842,55 @@
         }
     }
 
-    // Add My Shares button to user menu
-    function addMySharesButton() {
-        // Try to add to the header/dashboard area
-        // This button should be accessible from anywhere
-        if (document.querySelector('.btnMyShares')) return;
+    // Where the My Shares button goes: whichever header is actually on screen.
+    // Jellyfin 12 draws its own React app bar and keeps the legacy header in the
+    // page, hidden - which is where the button used to land, invisible. The new bar
+    // is found by its search button; the legacy one is the 10.11 layout.
+    function headerSlot() {
+        const shown = (el) => el && el.getClientRects().length > 0;
 
-        // Try to find the user menu or header buttons
-        const headerRight = document.querySelector('.headerRight') ||
-                           document.querySelector('.headerButtons');
-
-        if (headerRight && !headerRight.querySelector('.btnMyShares')) {
-            const mySharesBtn = document.createElement('button');
-            mySharesBtn.setAttribute('is', 'paper-icon-button-light');
-            mySharesBtn.classList.add('btnMyShares', 'paper-icon-button-light');
-            mySharesBtn.setAttribute('title', 'My Shares');
-            mySharesBtn.innerHTML = '<span class="material-icons">folder_shared</span>';
-            mySharesBtn.style.cssText = 'color: #fff; opacity: 0.8;';
-
-            mySharesBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                showMySharesDialog();
-            });
-
-            // Insert before the user button
-            const userBtn = headerRight.querySelector('.headerUserButton') ||
-                           headerRight.querySelector('.headerButton');
-            if (userBtn) {
-                headerRight.insertBefore(mySharesBtn, userBtn);
-            } else {
-                headerRight.appendChild(mySharesBtn);
-            }
+        const search = document.querySelector('.MuiAppBar-root a[href*="search"]');
+        if (shown(search)) {
+            // Borrowing the search button's classes makes ours the same size and
+            // colour, and gives it the same hover, without restating MUI's styles.
+            return { host: search.parentElement, before: search, className: search.className };
         }
+
+        const legacy = document.querySelector('.headerRight') || document.querySelector('.headerButtons');
+        if (shown(legacy)) {
+            return {
+                host: legacy,
+                before: legacy.querySelector('.headerUserButton') || legacy.querySelector('.headerButton'),
+                className: 'paper-icon-button-light'
+            };
+        }
+        return null;
+    }
+
+    // The button once placed. While it is still in the page there is nothing to
+    // do, and checking that costs no layout - this runs on DOM changes.
+    let mySharesBtn = null;
+
+    function addMySharesButton() {
+        if (mySharesBtn?.isConnected) return;
+        const slot = headerSlot();
+        if (!slot || slot.host.querySelector('.btnMyShares')) return;
+
+        mySharesBtn = document.createElement('button');
+        mySharesBtn.type = 'button';
+        mySharesBtn.className = slot.className;
+        mySharesBtn.classList.add('btnMyShares');
+        mySharesBtn.setAttribute('title', 'My Shares');
+        mySharesBtn.setAttribute('aria-label', 'My Shares');
+        mySharesBtn.innerHTML = '<span class="material-icons" aria-hidden="true">folder_shared</span>';
+
+        mySharesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            showMySharesDialog();
+        });
+
+        slot.host.insertBefore(mySharesBtn, slot.before || null);
     }
 
     // Extract item ID from current page
@@ -923,25 +939,24 @@
 
         console.log('Jellyfin Share: Config loaded, setting up observer');
 
-        // Watch for page changes
-        const observer = new MutationObserver((mutations) => {
-            if (isDetailPage()) {
-                setTimeout(addShareButton, 300);
-            }
-            // Always try to add My Shares button
-            setTimeout(addMySharesButton, 300);
-        });
+        // Watch for page changes. Jellyfin changes the DOM constantly - lazy
+        // cards, the player's clock - so a burst of mutations is folded into one
+        // pass instead of queueing a timer for each.
+        let pending = null;
+        const scheduleButtons = () => {
+            if (pending) return;
+            pending = setTimeout(() => {
+                pending = null;
+                if (isDetailPage()) addShareButton();
+                addMySharesButton();
+            }, 300);
+        };
 
-        observer.observe(document.body, {
+        new MutationObserver(scheduleButtons).observe(document.body, {
             childList: true,
             subtree: true
         });
-
-        // Initial check
-        if (isDetailPage()) {
-            setTimeout(addShareButton, 300);
-        }
-        setTimeout(addMySharesButton, 500);
+        scheduleButtons();
 
         console.log('Jellyfin Share: Plugin initialized successfully');
     }
