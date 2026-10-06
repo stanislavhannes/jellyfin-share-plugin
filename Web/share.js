@@ -13,7 +13,9 @@
         }
     };
 
-    // Load plugin configuration
+    // Load plugin configuration. Returns true or false for what the server said,
+    // and null when it could not be asked - typically because nobody is signed in
+    // yet, which is how the script starts on the login page.
     async function loadConfig() {
         try {
             const url = ApiClient.getUrl('plugins/share/config');
@@ -21,8 +23,12 @@
             pluginConfig = response;
             return pluginConfig.Configured === true;
         } catch (e) {
-            console.error('Jellyfin Share: Failed to load config', e);
-            return false;
+            // Without a session this is expected (the login page); with one it is
+            // a real failure and should not pass in silence.
+            if (ApiClient.accessToken && ApiClient.accessToken()) {
+                console.error('Jellyfin Share: Failed to load config', e);
+            }
+            return null;
         }
     }
 
@@ -903,6 +909,13 @@
         console.log('Jellyfin Share: Initializing...');
 
         const isConfigured = await loadConfig();
+        if (isConfigured === null) {
+            // The script is loaded once, with the page - before login. Signing in
+            // does not reload it, so without a retry the buttons only appeared
+            // after a manual refresh. Jellyfin announces every page it shows.
+            document.addEventListener('viewshow', init, { once: true });
+            return;
+        }
         if (!isConfigured) {
             console.warn('Jellyfin Share: Plugin not configured - check Dashboard > Plugins > Jellyfin Share');
             return;
