@@ -103,8 +103,16 @@ one starts working again the script loads twice.
    - **Password**: Optional password protection
    - **Max plays**: Limit total number of plays (0 = unlimited)
    - **Max concurrent viewers**: Limit simultaneous viewers (0 = unlimited)
+   - **Allow downloads** (on by default): viewers may save the original file, or a
+     season or series as one ZIP. Each download counts as one play, so a play
+     limit still holds. Needs a backend with per-share downloads; an older one
+     ignores the setting
 4. Click **Create Share Link**
 5. Copy and share the generated URL
+
+**My Shares** - the folder icon in the header, next to search - lists the links
+you created, with copy, QR code, statistics and revoke. A link with downloads
+switched off carries a *No downloads* badge.
 
 ## API Endpoints
 
@@ -147,6 +155,14 @@ dotnet build -c Release
 4. Do not add the script tag to branding settings - that is the legacy workaround
    this plugin replaced, and it loads the script twice
 
+### Copy does nothing, or shows "Press Ctrl+C"
+
+Browsers only grant scripts the clipboard API on HTTPS or `localhost`. Over plain
+`http://` on a LAN address the plugin falls back to the older selection-based
+copy, which works in every current browser. If that is refused too, the button
+says *Press Ctrl+C* and the link is selected in the field, so the shortcut
+finishes the job. Serving Jellyfin over HTTPS avoids the fallback altogether.
+
 ### "Plugin not configured" error
 
 1. Go to Dashboard → Plugins → Jellyfin Share
@@ -186,6 +202,16 @@ before being fixed.
   own backend address, which behind Docker or a proxy is not what a browser can
   open.
 - The configured default expiry was never read by the dialog.
+- Copy buttons copied nothing when Jellyfin was opened over plain HTTP, e.g. on a
+  LAN address: they relied on the clipboard API alone, which browsers withhold
+  outside HTTPS, and failed without a word. They now fall back to a selection
+  copy and say when they could not copy.
+- After signing in, the Share and My Shares buttons only appeared once the page
+  was reloaded. The script loads with the login page, its configuration request
+  failed for lack of a session, and it gave up; it now retries on the next page.
+- On Jellyfin 12 the My Shares button was invisible: it went into the legacy
+  header, which 12 keeps in the page but hides. It now goes into whichever
+  header is on screen.
 
 **Features**
 
@@ -193,6 +219,7 @@ before being fixed.
   episode.
 - Expiry in days, plus shares that never expire.
 - Quality choice per share: Original, 1080p, 720p or 480p.
+- Downloads switchable per share, on by default.
 - Jellyfin 12 support (net10.0, `targetAbi 12.1.0.0`). The `1.x` branch stays on
   net9.0 for Jellyfin 10.11.
 
