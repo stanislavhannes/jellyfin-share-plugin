@@ -263,7 +263,7 @@
                         <option value="720">720p (max 4 Mbit/s)</option>
                         <option value="480">480p (max 1.5 Mbit/s)</option>
                     </select>
-                    <div class="jfshare-hint">Lowers quality for this link only. Never raises it above the source.</div>
+                    <div class="jfshare-hint">Lowers streaming quality for this link only. Never raises it above the source. Downloads are always the original file.</div>
                 </div>
 
                 <div class="jfshare-field">

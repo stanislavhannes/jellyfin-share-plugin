@@ -99,7 +99,8 @@ one starts working again the script loads twice.
      link per season / per episode in a single step
    - **Expires in (days)**, or **Never expires** to create a link without a deadline
    - **Quality**: Original, 1080p, 720p or 480p. A cap only ever lowers quality;
-     it never raises it above the source
+     it never raises it above the source. It applies to streaming: a download
+     is always the original file
    - **Password**: Optional password protection
    - **Max plays**: Limit total number of plays (0 = unlimited)
    - **Max concurrent viewers**: Limit simultaneous viewers (0 = unlimited)
