@@ -115,7 +115,7 @@
                     ApiClient.getPluginConfiguration(JellyfinShareConfig.pluginUniqueId).then(function (config) {
                         config.BackendUrl = document.querySelector('#txtBackendUrl').value;
                         config.BackendApiKey = document.querySelector('#txtBackendApiKey').value;
-                        config.DefaultExpiryMinutes = (parseInt(document.querySelector('#txtExpiryDays').value) || 1) * 1440;
+                        config.DefaultExpiryMinutes = (parseInt(document.querySelector('#txtExpiryDays').value) || 30) * 1440;
                         config.DefaultNeverExpires = document.querySelector('#chkNeverExpires').checked;
                         config.DefaultMaxPlays = parseInt(document.querySelector('#txtMaxPlays').value) || 0;
                         config.DefaultMaxConcurrentViewers = parseInt(document.querySelector('#txtMaxConcurrent').value) || 0;

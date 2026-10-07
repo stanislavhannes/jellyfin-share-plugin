@@ -112,10 +112,13 @@
         const labelled = [...btn.childNodes].some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
         btn.addEventListener('click', async () => {
             const ok = await copyText(getText(), btn);
-            if (!ok) {
-                if (field) field.select();
-                else window.prompt('Copy this link:', getText());
+            if (!ok && !field) {
+                // The prompt is the way to copy here; once it is closed there is
+                // nothing left for the button to report.
+                window.prompt('Copy this link:', getText());
+                return;
             }
+            if (!ok) field.select();
             btn.innerHTML = `<span class="material-icons" style="font-size: inherit;">${ok ? 'check' : 'error_outline'}</span>`
                 + (labelled ? (ok ? ' Copied!' : ' Press Ctrl+C') : '');
             btn.title = ok ? 'Copied' : 'Could not copy automatically - press Ctrl+C (Cmd+C on a Mac)';
