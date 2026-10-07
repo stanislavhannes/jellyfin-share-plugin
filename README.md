@@ -46,8 +46,9 @@ server sees 2.x.
    This is how *this server* reaches the backend, which behind Docker or a reverse
    proxy is not the address a viewer opens - the backend reports that one itself.
 3. Enter your backend API key
-4. Configure the defaults the share dialog starts with: expiry in days, whether
-   shares never expire by default, max plays and max concurrent viewers
+4. Configure the defaults the share dialog starts with: expiry in days (30 to
+   begin with), whether shares never expire by default, max plays and max
+   concurrent viewers
 5. Click **Save**
 6. Click **Test Connection** to verify
 
@@ -160,9 +161,10 @@ dotnet build -c Release
 
 Browsers only grant scripts the clipboard API on HTTPS or `localhost`. Over plain
 `http://` on a LAN address the plugin falls back to the older selection-based
-copy, which works in every current browser. If that is refused too, the button
-says *Press Ctrl+C* and the link is selected in the field, so the shortcut
-finishes the job. Serving Jellyfin over HTTPS avoids the fallback altogether.
+copy, which works in every current browser. If that is refused too, the link is
+put where it can be copied by hand: selected in its field, where the button says
+*Press Ctrl+C*, or - for a button with no field beside it - shown in a prompt.
+Serving Jellyfin over HTTPS avoids the fallback altogether.
 
 ### "Plugin not configured" error
 
@@ -221,6 +223,8 @@ before being fixed.
 - Expiry in days, plus shares that never expire.
 - Quality choice per share: Original, 1080p, 720p or 480p.
 - Downloads switchable per share, on by default.
+- Links expire after 30 days by default instead of one. An existing installation
+  keeps the value saved in its settings until it is changed there.
 - Jellyfin 12 support (net10.0, `targetAbi 12.1.0.0`). The `1.x` branch stays on
   net9.0 for Jellyfin 10.11.
 
