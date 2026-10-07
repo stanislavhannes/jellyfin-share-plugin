@@ -48,7 +48,7 @@
     // Mirrors the plugin settings page: the configured default is stored in minutes
     // but both surfaces present it as whole days.
     function defaultExpiryDays() {
-        const minutes = pluginConfig?.DefaultExpiryMinutes || 1440;
+        const minutes = pluginConfig?.DefaultExpiryMinutes || 30 * 1440;
         return Math.max(1, Math.round(minutes / 1440));
     }
 

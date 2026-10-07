@@ -88,7 +88,7 @@
                     ApiClient.getPluginConfiguration(JellyfinShareConfig.pluginUniqueId).then(function (config) {
                         document.querySelector('#txtBackendUrl').value = config.BackendUrl || '';
                         document.querySelector('#txtBackendApiKey').value = config.BackendApiKey || '';
-                        var days = Math.max(1, Math.round((config.DefaultExpiryMinutes || 1440) / 1440));
+                        var days = Math.max(1, Math.round((config.DefaultExpiryMinutes || 30 * 1440) / 1440));
                         document.querySelector('#txtExpiryDays').value = days;
                         document.querySelector('#chkNeverExpires').checked = config.DefaultNeverExpires === true;
                         document.querySelector('#txtExpiryDays').disabled = config.DefaultNeverExpires === true;
