@@ -14,7 +14,7 @@ public class PluginConfiguration : BasePluginConfiguration
     {
         BackendUrl = "http://localhost:8097";
         BackendApiKey = string.Empty;
-        DefaultExpiryMinutes = 1440; // 24 hours
+        DefaultExpiryMinutes = 30 * 1440; // 30 days
         DefaultNeverExpires = false;
         DefaultMaxPlays = 0; // unlimited
         DefaultMaxConcurrentViewers = 0; // unlimited

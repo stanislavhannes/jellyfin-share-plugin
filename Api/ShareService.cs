@@ -279,6 +279,12 @@ public class CreateShareRequest
     /// Gets or sets the max concurrent viewers.
     /// </summary>
     public int? MaxConcurrentViewers { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether viewers may download the file.
+    /// Null is left to the backend, whose default is on.
+    /// </summary>
+    public bool? AllowDownload { get; set; }
 }
 
 /// <summary>
@@ -377,6 +383,12 @@ public class ShareListItem
     /// Gets or sets whether the share has a password.
     /// </summary>
     public bool HasPassword { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether viewers may download. Null from a backend that
+    /// predates the setting.
+    /// </summary>
+    public bool? AllowDownload { get; set; }
 }
 
 /// <summary>

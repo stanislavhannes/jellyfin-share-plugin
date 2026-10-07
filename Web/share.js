@@ -13,7 +13,9 @@
         }
     };
 
-    // Load plugin configuration
+    // Load plugin configuration. Returns true or false for what the server said,
+    // and null when it could not be asked - typically because nobody is signed in
+    // yet, which is how the script starts on the login page.
     async function loadConfig() {
         try {
             const url = ApiClient.getUrl('plugins/share/config');
@@ -21,8 +23,12 @@
             pluginConfig = response;
             return pluginConfig.Configured === true;
         } catch (e) {
-            console.error('Jellyfin Share: Failed to load config', e);
-            return false;
+            // Without a session this is expected (the login page); with one it is
+            // a real failure and should not pass in silence.
+            if (ApiClient.accessToken && ApiClient.accessToken()) {
+                console.error('Jellyfin Share: Failed to load config', e);
+            }
+            return null;
         }
     }
 
@@ -42,7 +48,7 @@
     // Mirrors the plugin settings page: the configured default is stored in minutes
     // but both surfaces present it as whole days.
     function defaultExpiryDays() {
-        const minutes = pluginConfig?.DefaultExpiryMinutes || 1440;
+        const minutes = pluginConfig?.DefaultExpiryMinutes || 30 * 1440;
         return Math.max(1, Math.round(minutes / 1440));
     }
 
@@ -56,6 +62,68 @@
         if (hours < 24) return `${hours}h left`;
         const days = Math.floor(hours / 24);
         return `${days}d left`;
+    }
+
+    // Copies text to the clipboard, and says whether it worked.
+    //
+    // navigator.clipboard exists only in a secure context - HTTPS or localhost.
+    // Jellyfin is very often opened over plain http on a LAN address, where it is
+    // undefined: the old buttons threw on the first line and copied nothing,
+    // without a word. The fallback is the selection-based copy every browser still
+    // honours there. Its textarea goes inside the open <dialog>: a modal makes the
+    // rest of the page inert, and a textarea appended to <body> could not be
+    // selected.
+    async function copyText(text, anchor) {
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (e) {
+                // Permission refused - fall through to the selection copy.
+            }
+        }
+        const host = anchor?.closest('dialog') || document.body;
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
+        host.appendChild(ta);
+        // iOS Safari only selects a field that has focus.
+        ta.focus();
+        ta.select();
+        try {
+            return document.execCommand('copy');
+        } catch (e) {
+            return false;
+        } finally {
+            ta.remove();
+        }
+    }
+
+    // Wires a copy button: a tick when it worked. When it did not, the link is
+    // put where the viewer can copy it by hand - selected in its field, or, for
+    // a button with no field beside it, in a prompt - and the button says so
+    // instead of pretending.
+    function bindCopy(btn, getText, field) {
+        const idle = btn.innerHTML;
+        // Icon-only buttons stay icon-only; a labelled one says what happened. The
+        // icon's own ligature ("content_copy") is text too, so only text outside
+        // it counts as a label.
+        const labelled = [...btn.childNodes].some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+        btn.addEventListener('click', async () => {
+            const ok = await copyText(getText(), btn);
+            if (!ok && !field) {
+                // The prompt is the way to copy here; once it is closed there is
+                // nothing left for the button to report.
+                window.prompt('Copy this link:', getText());
+                return;
+            }
+            if (!ok) field.select();
+            btn.innerHTML = `<span class="material-icons" style="font-size: inherit;">${ok ? 'check' : 'error_outline'}</span>`
+                + (labelled ? (ok ? ' Copied!' : ' Press Ctrl+C') : '');
+            btn.title = ok ? 'Copied' : 'Could not copy automatically - press Ctrl+C (Cmd+C on a Mac)';
+            setTimeout(() => { btn.innerHTML = idle; }, ok ? 2000 : 4000);
+        });
     }
 
     // Renders the single-share result into the shared result box. The batch branch
@@ -81,15 +149,8 @@
         `;
         resultDiv.querySelector('#shareUrl').value = publicUrl;
         resultDiv.querySelector('#shareQrCode').src = QRCode.generate(publicUrl, 150);
-        resultDiv.querySelector('#copyShareUrl').addEventListener('click', () => {
-            const urlInput = resultDiv.querySelector('#shareUrl');
-            urlInput.select();
-            navigator.clipboard.writeText(urlInput.value).then(() => {
-                const copyBtn = resultDiv.querySelector('#copyShareUrl');
-                copyBtn.innerHTML = '<span class="material-icons">check</span>';
-                setTimeout(() => { copyBtn.innerHTML = '<span class="material-icons">content_copy</span>'; }, 2000);
-            });
-        });
+        const urlInput = resultDiv.querySelector('#shareUrl');
+        bindCopy(resultDiv.querySelector('#copyShareUrl'), () => urlInput.value, urlInput);
         resultDiv.style.display = 'block';
     }
 
@@ -148,6 +209,7 @@
         .jfshare-badge-revoked { background: rgba(255,77,79,0.2); color: #ff6b6b; }
         .jfshare-badge-active { background: rgba(82,196,26,0.2); color: #52c41a; }
         .jfshare-badge-password { background: rgba(250,173,20,0.2); color: #faad14; }
+        .jfshare-badge-nodownload { background: rgba(255,255,255,0.08); color: #aaa; }
         .jfshare-empty { text-align: center; padding: 3em; color: #888; }
         .jfshare-analytics { margin-top: 1em; }
         .jfshare-stat { display: inline-block; text-align: center; padding: 1em; background: #2a2a2a; border-radius: 8px; margin-right: 1em; margin-bottom: 1em; min-width: 100px; }
@@ -204,7 +266,7 @@
                         <option value="720">720p (max 4 Mbit/s)</option>
                         <option value="480">480p (max 1.5 Mbit/s)</option>
                     </select>
-                    <div class="jfshare-hint">Lowers quality for this link only. Never raises it above the source.</div>
+                    <div class="jfshare-hint">Lowers streaming quality for this link only. Never raises it above the source. Downloads are always the original file.</div>
                 </div>
 
                 <div class="jfshare-field">
@@ -222,6 +284,14 @@
                     <label class="jfshare-label" for="shareMaxViewers">Max concurrent viewers</label>
                     <input type="number" id="shareMaxViewers" class="jfshare-input" value="0" min="0" />
                     <div class="jfshare-hint">0 = unlimited</div>
+                </div>
+
+                <div class="jfshare-field">
+                    <label class="jfshare-checkbox" style="margin-top: 0;">
+                        <input type="checkbox" id="shareAllowDownload" checked>
+                        <span>Allow downloads</span>
+                    </label>
+                    <div class="jfshare-hint">Viewers can save the original file${(isSeries || isSeason) ? ', or every episode as one ZIP' : ''}. Each download counts as one play.</div>
                 </div>
 
                 <!-- Filled by renderSingleResult or the batch branch. Both replace the
@@ -295,6 +365,7 @@
             const password = dlg.querySelector('#sharePassword').value || null;
             const maxPlays = parseInt(dlg.querySelector('#shareMaxPlays').value) || null;
             const maxViewers = parseInt(dlg.querySelector('#shareMaxViewers').value) || null;
+            const allowDownload = dlg.querySelector('#shareAllowDownload').checked;
 
             try {
                 if (shareType !== 'single') {
@@ -311,7 +382,8 @@
                             maxVideoBitrate: qualityBitrate,
                             password: password,
                             maxTotalPlays: maxPlays,
-                            maxConcurrentViewers: maxViewers
+                            maxConcurrentViewers: maxViewers,
+                            allowDownload: allowDownload
                         }),
                         dataType: 'json'
                     });
@@ -348,12 +420,7 @@
 
                         // Add event listeners for batch result buttons
                         resultDiv.querySelectorAll('.jfshare-btn-copy').forEach(btn => {
-                            btn.addEventListener('click', () => {
-                                navigator.clipboard.writeText(btn.dataset.url).then(() => {
-                                    btn.innerHTML = '<span class="material-icons" style="font-size: 0.9em;">check</span>';
-                                    setTimeout(() => { btn.innerHTML = '<span class="material-icons" style="font-size: 0.9em;">content_copy</span>'; }, 1500);
-                                });
-                            });
+                            bindCopy(btn, () => btn.dataset.url);
                         });
                         resultDiv.querySelectorAll('.jfshare-btn-qr').forEach(btn => {
                             btn.addEventListener('click', () => {
@@ -380,7 +447,8 @@
                             maxVideoBitrate: qualityBitrate,
                             password: password,
                             maxTotalPlays: maxPlays,
-                            maxConcurrentViewers: maxViewers
+                            maxConcurrentViewers: maxViewers,
+                            allowDownload: allowDownload
                         }),
                         dataType: 'json'
                     });
@@ -486,6 +554,7 @@
                                   share.IsExpired ? '<span class="jfshare-badge jfshare-badge-expired">Expired</span>' :
                                   '<span class="jfshare-badge jfshare-badge-active">Active</span>'}
                                 ${share.HasPassword ? '<span class="jfshare-badge jfshare-badge-password">Password</span>' : ''}
+                                ${share.AllowDownload === false ? '<span class="jfshare-badge jfshare-badge-nodownload">No downloads</span>' : ''}
                             </div>
                         </div>
                         <div class="jfshare-list-meta">
@@ -516,14 +585,7 @@
 
             // Add event listeners
             container.querySelectorAll('.jfshare-btn-copy').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    navigator.clipboard.writeText(btn.dataset.url).then(() => {
-                        btn.innerHTML = '<span class="material-icons" style="font-size: 1em;">check</span> Copied!';
-                        setTimeout(() => {
-                            btn.innerHTML = '<span class="material-icons" style="font-size: 1em;">content_copy</span> Copy';
-                        }, 2000);
-                    });
-                });
+                bindCopy(btn, () => btn.dataset.url);
             });
 
             container.querySelectorAll('.jfshare-btn-qr').forEach(btn => {
@@ -630,13 +692,7 @@
         dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
         dlg.addEventListener('close', () => dlg.remove());
 
-        dlg.querySelector('#copyQrUrl').addEventListener('click', () => {
-            navigator.clipboard.writeText(url).then(() => {
-                const btn = dlg.querySelector('#copyQrUrl');
-                btn.innerHTML = '<span class="material-icons">check</span>';
-                setTimeout(() => { btn.innerHTML = '<span class="material-icons">content_copy</span>'; }, 2000);
-            });
-        });
+        bindCopy(dlg.querySelector('#copyQrUrl'), () => url, dlg.querySelector('.jfshare-url'));
 
         dlg.showModal();
     }
@@ -795,39 +851,56 @@
         }
     }
 
-    // Add My Shares button to user menu
-    function addMySharesButton() {
-        // Try to add to the header/dashboard area
-        // This button should be accessible from anywhere
-        if (document.querySelector('.btnMyShares')) return;
+    // Where the My Shares button goes: whichever header is actually on screen.
+    // Jellyfin 12 draws its own React app bar and keeps the legacy header in the
+    // page, hidden - which is where the button used to land, invisible. The new bar
+    // is found by its search button; the legacy one is the 10.11 layout.
+    function headerSlot() {
+        const shown = (el) => el && el.getClientRects().length > 0;
 
-        // Try to find the user menu or header buttons
-        const headerRight = document.querySelector('.headerRight') ||
-                           document.querySelector('.headerButtons');
-
-        if (headerRight && !headerRight.querySelector('.btnMyShares')) {
-            const mySharesBtn = document.createElement('button');
-            mySharesBtn.setAttribute('is', 'paper-icon-button-light');
-            mySharesBtn.classList.add('btnMyShares', 'paper-icon-button-light');
-            mySharesBtn.setAttribute('title', 'My Shares');
-            mySharesBtn.innerHTML = '<span class="material-icons">folder_shared</span>';
-            mySharesBtn.style.cssText = 'color: #fff; opacity: 0.8;';
-
-            mySharesBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                showMySharesDialog();
-            });
-
-            // Insert before the user button
-            const userBtn = headerRight.querySelector('.headerUserButton') ||
-                           headerRight.querySelector('.headerButton');
-            if (userBtn) {
-                headerRight.insertBefore(mySharesBtn, userBtn);
-            } else {
-                headerRight.appendChild(mySharesBtn);
-            }
+        const search = document.querySelector('.MuiAppBar-root a[href*="search"]');
+        if (shown(search)) {
+            // Borrowing the search button's classes makes ours the same size and
+            // colour, and gives it the same hover, without restating MUI's styles.
+            return { host: search.parentElement, before: search, className: search.className };
         }
+
+        const legacy = document.querySelector('.headerRight') || document.querySelector('.headerButtons');
+        if (shown(legacy)) {
+            return {
+                host: legacy,
+                before: legacy.querySelector('.headerUserButton') || legacy.querySelector('.headerButton'),
+                className: 'paper-icon-button-light'
+            };
+        }
+        return null;
+    }
+
+    // The button once placed. While it is still in the page and on screen there
+    // is nothing to do. Jellyfin can keep a header in the page while hiding it,
+    // so being connected alone is not enough.
+    let mySharesBtn = null;
+
+    function addMySharesButton() {
+        if (mySharesBtn?.isConnected && mySharesBtn.getClientRects().length > 0) return;
+        const slot = headerSlot();
+        if (!slot || slot.host.querySelector('.btnMyShares')) return;
+
+        mySharesBtn = document.createElement('button');
+        mySharesBtn.type = 'button';
+        mySharesBtn.className = slot.className;
+        mySharesBtn.classList.add('btnMyShares');
+        mySharesBtn.setAttribute('title', 'My Shares');
+        mySharesBtn.setAttribute('aria-label', 'My Shares');
+        mySharesBtn.innerHTML = '<span class="material-icons" aria-hidden="true">folder_shared</span>';
+
+        mySharesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            showMySharesDialog();
+        });
+
+        slot.host.insertBefore(mySharesBtn, slot.before || null);
     }
 
     // Extract item ID from current page
@@ -862,6 +935,13 @@
         console.log('Jellyfin Share: Initializing...');
 
         const isConfigured = await loadConfig();
+        if (isConfigured === null) {
+            // The script is loaded once, with the page - before login. Signing in
+            // does not reload it, so without a retry the buttons only appeared
+            // after a manual refresh. Jellyfin announces every page it shows.
+            document.addEventListener('viewshow', init, { once: true });
+            return;
+        }
         if (!isConfigured) {
             console.warn('Jellyfin Share: Plugin not configured - check Dashboard > Plugins > Jellyfin Share');
             return;
@@ -869,25 +949,24 @@
 
         console.log('Jellyfin Share: Config loaded, setting up observer');
 
-        // Watch for page changes
-        const observer = new MutationObserver((mutations) => {
-            if (isDetailPage()) {
-                setTimeout(addShareButton, 300);
-            }
-            // Always try to add My Shares button
-            setTimeout(addMySharesButton, 300);
-        });
+        // Watch for page changes. Jellyfin changes the DOM constantly - lazy
+        // cards, the player's clock - so a burst of mutations is folded into one
+        // pass instead of queueing a timer for each.
+        let pending = null;
+        const scheduleButtons = () => {
+            if (pending) return;
+            pending = setTimeout(() => {
+                pending = null;
+                if (isDetailPage()) addShareButton();
+                addMySharesButton();
+            }, 300);
+        };
 
-        observer.observe(document.body, {
+        new MutationObserver(scheduleButtons).observe(document.body, {
             childList: true,
             subtree: true
         });
-
-        // Initial check
-        if (isDetailPage()) {
-            setTimeout(addShareButton, 300);
-        }
-        setTimeout(addMySharesButton, 500);
+        scheduleButtons();
 
         console.log('Jellyfin Share: Plugin initialized successfully');
     }
